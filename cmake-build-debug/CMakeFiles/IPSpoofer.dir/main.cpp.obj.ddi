@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "CMakeFiles\\IPSpoofer.dir\\main.cpp.obj",
+            "outputs": [
+                "C:\\Users\\Cyril\\CLionProjects\\IPSpoofer\\cmake-build-debug\\vc140.pdb",
+                "CMakeFiles\\IPSpoofer.dir\\main.cpp.obj.ddi"
+            ],
+            "requires": []
+        }
+    ]
+}
