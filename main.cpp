@@ -4,29 +4,52 @@
 #include <sstream>
 #include <winsock2.h>
 
+uint16_t checksum (uint16_t *addr, int len) {
+
+    int count = len;
+    uint32_t sum = 0;
+    uint16_t answer = 0;
+
+    while (count > 1) {
+        sum += *(addr++);
+        count -= 2;
+    }
+
+    if (count > 0) {
+        sum += *(uint8_t *) addr;
+    }
+
+    while (sum >> 16) {
+        sum = (sum & 0xffff) + (sum >> 16);
+    }
+
+    answer = ~sum;
+
+    return (answer);
+
+}
+
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
 
     // L1 - Physical Interface
     const std::string interfaceName = "\\Device\\NPF_{A4C97E65-B72C-4687-B214-51E15B3C8D1C}";
 
     // L2 - MAC Addresses
-    const std::string source_mac = "F4:01:E8:AD:42:45";
-    const std::string destination_mac = "AE:33:37:8D:DF:AA";
+    const std::string source_mac = "e4:5d:51:94:d0:40";
+    const std::string destination_mac = "04:7c:16:d9:5b:76";
 
     // L3 - IP Addresses
-    const std::string source_ip = "1.1.1.1";
+    const std::string source_ip = "192.168.1.1";
     const std::string destination_ip = "192.168.1.250";
 
     // L4 - Ports, Protocol & Payload (Data)
-    const uint16_t source_port = htons(54321);
-    const uint16_t destination_port = htons(12345);
-    const char payload[] = "This is a test string";
+    const char payload[] = "abcdefghijklmnopqurstvwxyzabcdef";
     const int payload_length = sizeof(payload) - 1;
 
     /*
      * Craft Packet - Ethernet Type 2 Frame
      */
-    // 14=ethernet header, 20=ip header, 8=udp header
+    // 14=ethernet header, 20=ip header, 8=icmp header
     int packet_len = 14 + 20 + 8 + payload_length;
     auto* packet = new u_char[packet_len];
     int packetByte = 0;
@@ -91,10 +114,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
     packet[21] = 0x00; // Fragment offset
 
     // TTL
-    packet[22] = 0x64;
+    packet[22] = 0x80;
 
-    // Protocol (UDP)
-    packet[23] = 0x11;
+    // Protocol (ICMP)
+    packet[23] = 0x01;
 
     // Select next byte to prepare for source/destination IP entries
     packetByte = 26;
@@ -118,42 +141,45 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
     // IPv4 Header done! (len=20)
 
     /*
-     * UDP Header
-     * https://en.wikipedia.org/wiki/User_Datagram_Protocol#UDP_datagram_structure
+     * ICMP Header
+     * https://en.wikipedia.org/wiki/Internet_Control_Message_Protocol#Header
      */
 
-    // Source Port
-    packet[34] = source_port & 0xFF;        // Low byte
-    packet[35] = (source_port >> 8) & 0xFF; // High byte
+    // Type
+    packet[34] = 8; // Echo Request
 
-    // Source Port
-    packet[36] = destination_port & 0xFF;        // Low byte
-    packet[37] = (destination_port >> 8) & 0xFF; // High byte
+    // Code
+    packet[35] = 0; // Echo Request
 
-    // UDP Length
-    uint16_t udp_length = htons(8 + payload_length);
-    packet[38] = udp_length & 0xFF;        // Low byte
-    packet[39] = (udp_length >> 8) & 0xFF; // High byte
+    // Checksum (calculated later)
+    packet[36] = 0;
+    packet[37] = 0;
+
+    // Identifier
+    uint16_t identifier = htons(1);
+    packet[38] = identifier & 0xFF;        // Low byte
+    packet[39] = (identifier >> 8) & 0xFF; // High byte
+
+    // Sequence Number
+    uint16_t sequence_number = htons(1);
+    packet[40] = sequence_number & 0xFF;        // Low byte
+    packet[41] = (sequence_number >> 8) & 0xFF; // High byte
 
     // Payload
     for (size_t i = 0; i < payload_length; ++i) {
         packet[42 + i] = payload[i];
     }
 
-    // Calculate IPv4 checksum
-    uint32_t cksum = 0;
-    for (int i = 14; i < 34; i += 2) {
-        cksum += *(uint16_t*)(packet + i);
-    }
+    // Checksum
+    uint16_t icmp_checksum = checksum((uint16_t *) (packet + 34), 8 + payload_length);
+    packet[36] = icmp_checksum & 0xFF;        // Low byte
+    packet[37] = (icmp_checksum >> 8) & 0xFF; // High byte
 
-    while (cksum >> 16) {
-        cksum = (cksum & 0xFFFF) + (cksum >> 16);
-    }
+    // ICMP Header done! (len=8)
 
-    cksum = ~cksum;
-    *(uint16_t*)(packet + 24) = cksum;
-
-    // UDP Header done! (len=8)
+    // IPv4 checksum
+    uint16_t ipv4_cksum = checksum((uint16_t *)(packet + 14), 20);
+    *(uint16_t*)(packet + 24) = ipv4_cksum;
 
     // Packet crafting done!
 
