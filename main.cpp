@@ -11,7 +11,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
 
     // L2 - MAC Addresses
     const std::string source_mac = "F4:01:E8:AD:42:45";
-    const std::string destination_mac = "04:7C:16:D9:5B:76";
+    const std::string destination_mac = "AE:33:37:8D:DF:AA";
 
     // L3 - IP Addresses
     const std::string source_ip = "1.1.1.1";
